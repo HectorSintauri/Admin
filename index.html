@@ -187,10 +187,30 @@
 </head>
 <body>
 
+<!-- ════ LOGIN GATE ════ -->
+<div id="authGate" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#0b0907);display:flex;align-items:center;justify-content:center;font-family:inherit">
+  <div style="width:min(360px,90vw);background:var(--surface2,#16120d);border:1px solid var(--border,#2a2219);border-radius:14px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="text-align:center;font-size:30px;margin-bottom:8px">☽</div>
+    <h2 style="text-align:center;font-family:'Cinzel',serif;font-weight:600;margin:0 0 4px;color:var(--ink,#ece3cc);font-size:19px">Liber Syntauri</h2>
+    <p style="text-align:center;color:var(--text-dim,#8a7d63);font-size:13px;margin:0 0 22px">Panel interno · acceso restringido</p>
+    <label style="display:block;font-size:12px;color:var(--text-dim,#8a7d63);margin-bottom:5px">Correo</label>
+    <input id="authEmail" type="email" autocomplete="username" placeholder="tucorreo@ejemplo.com"
+      style="width:100%;box-sizing:border-box;background:var(--surface,#0f0c08);border:1px solid var(--border,#2a2219);border-radius:8px;padding:11px 12px;color:var(--ink,#ece3cc);font-size:14px;margin-bottom:14px">
+    <label style="display:block;font-size:12px;color:var(--text-dim,#8a7d63);margin-bottom:5px">Contraseña</label>
+    <input id="authPass" type="password" autocomplete="current-password" placeholder="••••••••"
+      style="width:100%;box-sizing:border-box;background:var(--surface,#0f0c08);border:1px solid var(--border,#2a2219);border-radius:8px;padding:11px 12px;color:var(--ink,#ece3cc);font-size:14px;margin-bottom:18px">
+    <button id="authBtn"
+      style="width:100%;background:var(--border-lit,#caa75a);color:#1a1409;border:none;border-radius:8px;padding:12px;font-family:'Cinzel',serif;font-weight:600;font-size:14px;cursor:pointer">Entrar</button>
+    <div id="authMsg" style="text-align:center;color:#d4622a;font-size:12.5px;margin-top:14px;min-height:16px"></div>
+  </div>
+</div>
+
+
 <!-- ════ CONFIG: pega tus credenciales ════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://mfxvfbwgcsgnubtfdcyj.supabase.co';
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meHZmYndnY3NnbnVidGZkY3lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNTk4ODIsImV4cCI6MjA5NTkzNTg4Mn0.IPkkOTYM1H3SzE3Az5E49FR6LwMLSQ6kMm-Ye9T_-nE'; // service_role (solo panel interno, NUNCA en la app pública)
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1meHZmYndnY3NnbnVidGZkY3lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzNTk4ODIsImV4cCI6MjA5NTkzNTg4Mn0.IPkkOTYM1H3SzE3Az5E49FR6LwMLSQ6kMm-Ye9T_-nE'; // clave ANON (pública por diseño). La protección real es el login + RLS en la base de datos. NUNCA pongas aquí la service_role.
 </script>
 
 <div class="layout">
@@ -225,6 +245,7 @@
       <div class="prog-top"><span class="lbl">Progreso total</span><span class="val" id="pVal">0 / 5184</span></div>
       <div class="prog-track"><div class="prog-fill" id="pFill"></div></div>
       <div class="prog-pct" id="pPct">0.0 %</div>
+      <div style="margin-top:10px;text-align:right"><a id="signOut" href="#" style="font-size:11.5px;color:var(--text-dim,#8a7d63);text-decoration:none">Cerrar sesión</a></div>
     </div>
 
     <div class="list" id="list"></div>
@@ -314,11 +335,41 @@
 <script>
 // ════════ API ════════
 const CONFIGURED = !SUPABASE_URL.includes('TU_PROJECT_ID');
-const headers = {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'};
+// Supabase Auth client (separate from the REST helper below)
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Current access token, set after login. Until then, requests use the anon key.
+let ACCESS_TOKEN = null;
+// Headers are now a getter so every request uses the live session token when present.
+// apikey stays the anon key (PostgREST requires it); Authorization carries the
+// logged-in user's token so the database sees an 'authenticated' request and RLS applies.
+function authHeaders(extra){
+  return Object.assign({
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${ACCESS_TOKEN || SUPABASE_KEY}`,
+    'Content-Type': 'application/json'
+  }, extra||{});
+}
+const headers = authHeaders(); // kept for any legacy reference; live calls use authHeaders()
 const api = {
-  async get(t,q=''){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${q}`,{headers});if(!r.ok)throw new Error(await r.text());return r.json();},
+  async get(t,q=''){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${q}`,{headers:authHeaders()});if(!r.ok)throw new Error(await r.text());return r.json();},
+  // Paginated fetch: PostgREST caps each response at 1000 rows, so page through
+  // with the Range header until all rows are retrieved (e.g. all 5184 combinaciones).
+  async getAll(t,q='',page=1000){
+    let out=[], from=0;
+    while(true){
+      const to=from+page-1;
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}?${q}`,
+        {headers:authHeaders({'Range-Unit':'items','Range':`${from}-${to}`})});
+      if(!r.ok)throw new Error(await r.text());
+      const batch=await r.json();
+      out=out.concat(batch);
+      if(batch.length<page)break;   // last page reached
+      from+=page;
+    }
+    return out;
+  },
   async upsert(t,d){const r=await fetch(`${SUPABASE_URL}/rest/v1/${t}`,{method:'POST',
-    headers:{...headers,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(d)});
+    headers:authHeaders({'Prefer':'resolution=merge-duplicates,return=minimal'}),body:JSON.stringify(d)});
     if(!r.ok)throw new Error(await r.text());return true;}
 };
 
@@ -336,7 +387,7 @@ async function init(){
     signos = await api.get('signos','select=*&order=orden');
     (await api.get('interacciones_elementos','select=*'))
       .forEach(i=>inter[`${i.elemento_personal}-${i.elemento_dia}`]=i);
-    (await api.get('combinaciones','select=signo_personal_id,signo_dia_id,completado,titulo'))
+    (await api.getAll('combinaciones','select=signo_personal_id,signo_dia_id,completado,titulo&order=signo_personal_id,signo_dia_id'))
       .forEach(c=>combos[`${c.signo_personal_id}-${c.signo_dia_id}`]=c);
     el('empty').innerHTML='<div class="sym">☽</div><h3>Selecciona un espíritu</h3><p>Elige un signo del panel izquierdo para editar sus 72 combinaciones.</p>';
     renderList(); updateProgress();
@@ -487,7 +538,44 @@ document.querySelectorAll('#segEstado button').forEach(b=>b.addEventListener('cl
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 el('ov').addEventListener('click',e=>{if(e.target===el('ov'))closeModal();});
 
-init();
+// ════════ AUTH GATE ════════
+const authMsg = m => { const e=el('authMsg'); if(e) e.textContent = m||''; };
+
+async function showAdmin(session){
+  ACCESS_TOKEN = session.access_token;
+  el('authGate').style.display = 'none';
+  const so = el('signOut');
+  if(so) so.addEventListener('click', async (e)=>{ e.preventDefault(); await sb.auth.signOut(); location.reload(); });
+  await init();              // run the real panel only after a valid session
+}
+
+async function startAuth(){
+  // Already logged in? (session persists in localStorage via supabase-js)
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ await showAdmin(session); return; }
+
+  // Wire the login form
+  const doLogin = async () => {
+    const email = el('authEmail').value.trim();
+    const password = el('authPass').value;
+    if(!email || !password){ authMsg('Ingresa correo y contraseña.'); return; }
+    authMsg('Verificando…');
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){ authMsg(error.message || 'No se pudo iniciar sesión.'); return; }
+    authMsg('');
+    await showAdmin(data.session);
+  };
+  el('authBtn').addEventListener('click', doLogin);
+  el('authPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  el('authEmail').addEventListener('keydown', e=>{ if(e.key==='Enter') el('authPass').focus(); });
+
+  // If the session expires or is signed out elsewhere, re-show the gate
+  sb.auth.onAuthStateChange((_evt, sess)=>{
+    if(!sess){ ACCESS_TOKEN=null; el('authGate').style.display='flex'; }
+  });
+}
+
+startAuth();
 </script>
 </body>
 </html>
