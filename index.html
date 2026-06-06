@@ -296,14 +296,18 @@
   <div class="modal">
     <div class="mh">
       <h3 id="modTitle">—</h3>
+      <button id="ctxCollapse" type="button" title="Mostrar/ocultar datos del signo"
+        style="margin-left:auto;background:none;border:1px solid var(--border,#2a2219);border-radius:7px;color:var(--ink-dim,#a99c80);font-size:11px;letter-spacing:1px;padding:6px 11px;cursor:pointer;text-transform:uppercase;font-family:'Cinzel',serif">▾ Datos</button>
       <button class="x-btn" onclick="closeModal()">×</button>
     </div>
 
-    <div class="ctx">
-      <div class="pan" id="ctxP"></div>
-      <div class="pan" id="ctxD"></div>
+    <div id="ctxWrap">
+      <div class="ctx">
+        <div class="pan" id="ctxP"></div>
+        <div class="pan" id="ctxD"></div>
+      </div>
+      <div class="inter" id="inter"></div>
     </div>
-    <div class="inter" id="inter"></div>
 
     <div class="form">
       <div class="fg">
@@ -584,6 +588,7 @@ async function openEditor(pid,did){
   el('fTension').value=ex?.tension||''; el('fDon').value=ex?.don_combinacion||'';
   el('fSombra').value=ex?.sombra_combinacion||''; el('fFrase').value=ex?.frase_dia||'';
   el('fDone').checked=ex?.completado??false;
+  applyCtx();
   setStatus(''); el('ov').classList.add('open');
 }
 const crow=(k,v)=>`<div class="crow"><span class="k">${k}</span><span class="v">${v}</span></div>`;
@@ -626,6 +631,14 @@ function updateProgress(){
 el('search').addEventListener('input',renderList);
 el('descToggle').addEventListener('click',toggleDesc);
 el('descSave').addEventListener('click',saveDesc);
+// Collapse/expand the static signo-data block in the pair editor. State persists
+// across pair-opens so it stays hidden while editing many pairs in a row.
+let ctxHidden = false;
+function applyCtx(){
+  el('ctxWrap').style.display = ctxHidden ? 'none' : 'block';
+  el('ctxCollapse').textContent = ctxHidden ? '▸ Datos' : '▾ Datos';
+}
+el('ctxCollapse').addEventListener('click',()=>{ ctxHidden=!ctxHidden; applyCtx(); });
 el('fElem').addEventListener('change',()=>{renderList();if(active)renderGrid();});
 document.querySelectorAll('#segEstado button').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('#segEstado button').forEach(x=>x.classList.remove('on'));
