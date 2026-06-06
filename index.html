@@ -267,14 +267,14 @@
     </div>
 
     <!-- ════ DESCRIPCIÓN COMPLETA DEL ESPÍRITU (editable) ════ -->
-    <div id="descPanel" style="display:none;margin:0 0 22px;border:1px solid var(--border,#2a2219);border-radius:12px;background:linear-gradient(165deg,var(--panel,#16120d) 0%,#0d0a07 100%);overflow:hidden">
+    <div id="descPanel" style="display:none;margin:0 30px 0;flex-shrink:0;border:1px solid var(--border,#2a2219);border-radius:12px;background:linear-gradient(165deg,var(--panel,#16120d) 0%,#0d0a07 100%);overflow:hidden">
       <div id="descToggle" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none">
         <span style="font-family:'Cinzel',serif;font-size:12px;letter-spacing:2px;color:var(--gold-dim,#7a6330);text-transform:uppercase">Descripción completa</span>
         <span id="descChevron" style="color:var(--gold-dim,#7a6330);font-size:13px">▸ ver / editar</span>
       </div>
-      <div id="descBody" style="display:none;padding:4px 18px 18px">
+      <div id="descBody" style="display:none;padding:4px 18px 18px;max-height:60vh;overflow-y:auto">
         <div id="descFields"></div>
-        <div style="display:flex;align-items:center;gap:14px;margin-top:16px">
+        <div style="display:flex;align-items:center;gap:14px;margin-top:16px;position:sticky;bottom:0;background:linear-gradient(180deg,transparent,#0d0a07 30%);padding-top:10px">
           <button id="descSave" style="background:linear-gradient(180deg,var(--gold-bright,#e8c874),var(--gold,#cba653));color:#1a1208;border:none;border-radius:8px;padding:11px 22px;font-family:'Cinzel',serif;font-size:12px;letter-spacing:2px;font-weight:600;text-transform:uppercase;cursor:pointer">Guardar descripción</button>
           <span id="descStatus" style="font-size:12.5px;color:var(--ink-dim,#a99c80)"></span>
         </div>
